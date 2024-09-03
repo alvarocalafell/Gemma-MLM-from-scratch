@@ -6,7 +6,22 @@ import torch
 IMAGENET_STANDARD_MEAN = [0.5, 0.5, 0.5]
 IMAGENET_STANDARD_STD = [0.5, 0.5, 0.5]
 
-def add_image_tokens_to_prompt(prefix_prompt, bos_token, image_seq_len, image_token):
+def add_image_tokens_to_prompt(prefix_prompt: str, bos_token: str, image_seq_len: int, image_token: str) -> str:
+    """
+    Prepend image tokens to the prompt and add necessary tokens as per the PaLI-Gemma model requirements.
+
+    Args:
+        prefix_prompt (str): The original text prompt.
+        bos_token (str): The beginning-of-sequence token.
+        image_seq_len (int): The number of image tokens to prepend.
+        image_token (str): The image token to be repeated.
+
+    Returns:
+        str: The modified prompt with prepended image tokens and additional required tokens.
+
+    Note:
+        This function follows the PaLI-Gemma input format as described in the official blog.
+    """
     # Quoting from the blog (https://huggingface.co/blog/paligemma#detailed-inference-process):
     #   The input text is tokenized normally.
     #   A <bos> token is added at the beginning, and an additional newline token (\n) is appended.
@@ -20,6 +35,17 @@ def add_image_tokens_to_prompt(prefix_prompt, bos_token, image_seq_len, image_to
 def rescale(
     image: np.ndarray, scale: float, dtype: np.dtype = np.float32
 ) -> np.ndarray:
+    """
+    Rescale the pixel values of an image.
+
+    Args:
+        image (np.ndarray): The input image as a numpy array.
+        scale (float): The scaling factor to apply to the pixel values.
+        dtype (np.dtype, optional): The desired output data type. Defaults to np.float32.
+
+    Returns:
+        np.ndarray: The rescaled image as a numpy array.
+    """
     rescaled_image = image * scale
     rescaled_image = rescaled_image.astype(dtype)
     return rescaled_image
@@ -31,6 +57,18 @@ def resize(
     resample: Image.Resampling = None,
     reducing_gap: Optional[int] = None,
 ) -> np.ndarray:
+    """
+    Resize an image to the specified dimensions.
+
+    Args:
+        image (Image): The input PIL Image.
+        size (Tuple[int, int]): The target size as (height, width).
+        resample (Image.Resampling, optional): The resampling filter to use. Defaults to None.
+        reducing_gap (Optional[int], optional): Parameter for antialias. Defaults to None.
+
+    Returns:
+        np.ndarray: The resized image as a numpy array.
+    """
     height, width = size
     resized_image = image.resize(
         (width, height), resample=resample, reducing_gap=reducing_gap
@@ -43,6 +81,17 @@ def normalize(
     mean: Union[float, Iterable[float]],
     std: Union[float, Iterable[float]],
 ) -> np.ndarray:
+    """
+    Normalize an image by subtracting the mean and dividing by the standard deviation.
+
+    Args:
+        image (np.ndarray): The input image as a numpy array.
+        mean (Union[float, Iterable[float]]): The mean value(s) to subtract.
+        std (Union[float, Iterable[float]]): The standard deviation value(s) to divide by.
+
+    Returns:
+        np.ndarray: The normalized image as a numpy array.
+    """
     mean = np.array(mean, dtype=image.dtype)
     std = np.array(std, dtype=image.dtype)
     image = (image - mean) / std
@@ -57,6 +106,20 @@ def process_images(
     image_mean: Optional[Union[float, List[float]]] = None,
     image_std: Optional[Union[float, List[float]]] = None,
 ) -> List[np.ndarray]:
+    """
+    Process a list of images by resizing, rescaling, and normalizing them.
+
+    Args:
+        images (List[Image.Image]): A list of PIL Images to process.
+        size (Dict[str, int], optional): The target size as a dictionary with keys 0 and 1 for height and width.
+        resample (Image.Resampling, optional): The resampling filter to use for resizing.
+        rescale_factor (float, optional): The factor to rescale pixel values.
+        image_mean (Optional[Union[float, List[float]]], optional): The mean value(s) for normalization.
+        image_std (Optional[Union[float, List[float]]], optional): The standard deviation value(s) for normalization.
+
+    Returns:
+        List[np.ndarray]: A list of processed images as numpy arrays in the format [Channel, Height, Width].
+    """
     height, width = size[0], size[1]
     images = [
         resize(image=image, size=(height, width), resample=resample) for image in images
@@ -72,10 +135,24 @@ def process_images(
     return images
 
 class PaliGemmaProcessor:
+    """
+    A processor class for preparing inputs for the PaLI-Gemma model.
+
+    This class handles tokenization of text inputs and processing of image inputs
+    to prepare them for the PaLI-Gemma model.
+    """
     
     IMAGE_TOKEN = "<image>" #Here we're inserting placeholder tokens that will be replaced by the embeddings obtained from the vision encoder
 
     def __init__(self, tokenizer, num_image_tokens: int, image_size: int):
+        """
+        Initialize the PaliGemmaProcessor.
+
+        Args:
+            tokenizer: The tokenizer to use for text processing.
+            num_image_tokens (int): The number of image tokens to use.
+            image_size (int): The size to which images should be resized.
+        """
         super().__init__()
         
         self.image_seq_length = num_image_tokens
@@ -105,6 +182,21 @@ class PaliGemmaProcessor:
         padding: str = "longest",
         truncation: bool = True,
     ) -> dict:
+        """
+        Process text and images for input to the PaLI-Gemma model.
+
+        Args:
+            text (List[str]): A list of text prompts.
+            images (List[Image.Image]): A list of PIL Images.
+            padding (str, optional): The padding strategy. Defaults to "longest".
+            truncation (bool, optional): Whether to truncate sequences. Defaults to True.
+
+        Returns:
+            dict: A dictionary containing the processed inputs, including 'pixel_values' and tokenized text inputs.
+
+        Raises:
+            AssertionError: If the number of images doesn't match the number of text prompts.
+        """
         assert len(images) == 1 and len(text) == 1, f"Received {len(images)} images for {len(text)} prompts."
         
         #Converts into a list of tensors that can be understood by the model

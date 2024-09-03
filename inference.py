@@ -7,14 +7,36 @@ from modeling_gemma import KVCache, PaliGemmaForConditionalGeneration
 from utils import load_hf_model
 
 
-def move_inputs_to_device(model_inputs: dict, device: str):
+def move_inputs_to_device(model_inputs: dict, device: str) -> dict:
+    """
+    Move model inputs to the specified device.
+
+    Args:
+        model_inputs (dict): A dictionary containing model input tensors.
+        device (str): The target device to move the inputs to (e.g., 'cuda', 'cpu').
+
+    Returns:
+        dict: A dictionary with all input tensors moved to the specified device.
+    """
     model_inputs = {k: v.to(device) for k, v in model_inputs.items()}
     return model_inputs
 
 
 def get_model_inputs(
     processor: PaliGemmaProcessor, prompt: str, image_file_path: str, device: str
-):
+) -> dict:
+    """
+    Prepare model inputs from a prompt and an image file.
+
+    Args:
+        processor (PaliGemmaProcessor): The processor for tokenizing text and processing images.
+        prompt (str): The text prompt to process.
+        image_file_path (str): The file path of the image to process.
+        device (str): The device to move the processed inputs to.
+
+    Returns:
+        dict: A dictionary containing the processed and device-moved model inputs.
+    """
     image = Image.open(image_file_path)
     images = [image]
     prompts = [prompt]
@@ -33,7 +55,24 @@ def test_inference(
     temperature: float,
     top_p: float,
     do_sample: bool,
-):
+) -> None:
+    """
+    Run inference on the model with the given inputs and parameters.
+
+    Args:
+        model (PaliGemmaForConditionalGeneration): The model to run inference on.
+        processor (PaliGemmaProcessor): The processor for tokenizing and processing inputs.
+        device (str): The device to run inference on.
+        prompt (str): The text prompt to use for generation.
+        image_file_path (str): The file path of the image to use.
+        max_tokens_to_generate (int): The maximum number of tokens to generate.
+        temperature (float): The temperature for sampling.
+        top_p (float): The top-p value for nucleus sampling.
+        do_sample (bool): Whether to use sampling for generation.
+
+    Returns:
+        None: Prints the generated text.
+    """
     model_inputs = get_model_inputs(processor, prompt, image_file_path, device)
     input_ids = model_inputs["input_ids"]
     attention_mask = model_inputs["attention_mask"]
@@ -81,7 +120,17 @@ def test_inference(
     print(prompt + decoded)
 
 
-def _sample_top_p(probs: torch.Tensor, p: float):
+def _sample_top_p(probs: torch.Tensor, p: float) -> torch.Tensor:
+    """
+    Perform top-p (nucleus) sampling on the given probability distribution.
+
+    Args:
+        probs (torch.Tensor): The input probability distribution.
+        p (float): The cumulative probability threshold for top-p sampling.
+
+    Returns:
+        torch.Tensor: The sampled token indices.
+    """
     # (B, vocab_size)
     probs_sort, probs_idx = torch.sort(probs, dim=-1, descending=True)
     # (B, vocab_size)
@@ -109,7 +158,23 @@ def main(
     top_p: float = 0.9,
     do_sample: bool = False,
     only_cpu: bool = False,
-):
+) -> None:
+    """
+    Main function to load the model and run inference.
+
+    Args:
+        model_path (str, optional): Path to the model. Defaults to None.
+        prompt (str, optional): Text prompt for generation. Defaults to None.
+        image_file_path (str, optional): Path to the image file. Defaults to None.
+        max_tokens_to_generate (int, optional): Maximum number of tokens to generate. Defaults to 100.
+        temperature (float, optional): Temperature for sampling. Defaults to 0.8.
+        top_p (float, optional): Top-p value for nucleus sampling. Defaults to 0.9.
+        do_sample (bool, optional): Whether to use sampling for generation. Defaults to False.
+        only_cpu (bool, optional): Whether to force CPU usage only. Defaults to False.
+
+    Returns:
+        None: Runs the inference and prints the result.
+    """
     device = "cpu"
 
     if not only_cpu:
