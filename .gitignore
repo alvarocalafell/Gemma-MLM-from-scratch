@@ -162,3 +162,5 @@ cython_debug/
 #.idea/
 
 gemma/
+paligemma-weights/
+.DS_Store
