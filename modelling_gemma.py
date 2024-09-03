@@ -25,6 +25,21 @@ class GemmaConfig():
         pad_token_id=None,
         **kwargs,
     ):
+        """
+        vocab_size: Number of tokens in our Vocabulary
+        hidden_size: Size of the embedding vector of each token
+        intermediate_size: Size of each linear layer (Same as in Siglip)
+        num_hidden_layers: Number of layers in our transformer
+        num_attention_heads: Number of heads for the queries
+        num_key_value_heads:
+        head_dim: Number of dimensions each head will work with
+        max_position_embeddings: Maximum number of positions our model has been trained on
+        rms_norm_eps: Value for layernorm
+        rope_theta: Base frequency
+        attention_bias: Indicates if we want Bias in the attention matrix, set by default to False
+        attention_dropout: Not used
+        pad_token_id=None,
+        """
         super().__init__()
         self.vocab_size = vocab_size
         self.max_position_embeddings = max_position_embeddings
@@ -55,6 +70,16 @@ class PaliGemmaConfig():
         pad_token_id=None,
         **kwargs,
     ):
+        
+        """
+        vision_config: Configuration of the visual encoder,
+        text_config: Configuration of the text decoder, in this case Gemma
+        ignore_index: Not used in this case
+        image_token_index: Token corresponding to the image placeholder token
+        vocab_size: Vocabulary size of the model
+        projection_dim: Final dimension of the image features that should be resized before feeding to the LLM, output size of the linear layer.
+        hidden_size: Embedding size of the Language Model
+        """
         super().__init__()
         self.ignore_index = ignore_index
         self.image_token_index = image_token_index
@@ -89,6 +114,39 @@ class PaliGemmaForConditionalGeneration(nn.Module):
     
     def tie_weights(self):
         return self.language_model.tie_weights()
+    
+    def _merge_input_ids_with_image_features(
+        self, image_features: torch.Tensor, inputs_embeds: torch.Tensor, input_ids: torch.Tensor, attention_mask: torch.Tensor, kv_cache: Optional[KVCache] = None
+    ):
+        _, _, embed_dim = image_features.shape
+        batch_size, sequence_length = input_ids.shape
+        dtype, device = inputs_embeds.dtype, inputs_embeds.device
+        # Shape: [Batch_Size, Seq_Len, Hidden_Size]
+        scaled_image_features = image_features / (self.config.hidden_size**0.5)
+    
+        # Combine the embeddings of the image tokens, the text tokens and mask out all the padding tokens.
+        final_embedding = torch.zeros(batch_size, sequence_length, embed_dim, dtype=inputs_embeds.dtype, device=inputs_embeds.device)
+        # Shape: [Batch_Size, Seq_Len]. True for text tokens
+        text_mask = (input_ids != self.config.image_token_index) & (input_ids != self.pad_token_id)
+        # Shape: [Batch_Size, Seq_Len]. True for image tokens
+        image_mask = input_ids == self.config.image_token_index
+        # Shape: [Batch_Size, Seq_Len]. True for padding tokens
+        pad_mask = input_ids == self.pad_token_id
+
+        # We need to expand the masks to the embedding dimension otherwise we can't use them in torch.where
+        text_mask_expanded = text_mask.unsqueeze(-1).expand(-1, -1, embed_dim)
+        pad_mask_expanded = pad_mask.unsqueeze(-1).expand(-1, -1, embed_dim)
+        image_mask_expanded = image_mask.unsqueeze(-1).expand(-1, -1, embed_dim)
+
+        # Add the text embeddings
+        final_embedding = torch.where(text_mask_expanded, inputs_embeds, final_embedding)
+        # Insert image embeddings. We can't use torch.where because the sequence length of scaled_image_features is not equal to the sequence length of the final embedding
+        final_embedding = final_embedding.masked_scatter(image_mask_expanded, scaled_image_features)
+        # Zero out padding tokens
+        final_embedding = torch.where(pad_mask_expanded, torch.zeros_like(final_embedding), final_embedding)
+        
+        
+
 
     def forward(
         self,
