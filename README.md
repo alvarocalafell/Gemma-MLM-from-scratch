@@ -16,7 +16,7 @@ PaliGemma is a transformer-based model that combines vision and language process
 
 ## Model Architecture
 
-![PaliGemma Model Architecture](images/paligemma_mmodel.png)
+![PaliGemma Model Architecture](images/paligemma_model.png)
 
 The PaliGemma model consists of several key components:
 
