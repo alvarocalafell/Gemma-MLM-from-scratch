@@ -16,6 +16,8 @@ PaliGemma is a transformer-based model that combines vision and language process
 
 ## Model Architecture
 
+![PaliGemma Model Architecture](images/paligemma_mmodel.png)
+
 The PaliGemma model consists of several key components:
 
 1. **Vision Transformer**: Processes input images and converts them into embeddings.
@@ -36,7 +38,7 @@ The PaliGemma model consists of several key components:
 
 PaliGemma uses a unique masking strategy that differs from many other language models:
 
-![PaliGemma Masking Strategy](path_to_your_image.png)
+![PaliGemma Masking Strategy](images/paligemma_masking.png)
 
 - **Image Tokens**: Fully attend to each other and the entire prefix.
 - **Prefix Tokens**: Have bidirectional attention within the prefix and to image tokens.
