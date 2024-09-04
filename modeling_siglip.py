@@ -87,7 +87,7 @@ class SiglipVisionEmbeddings(nn.Module):
             in_channels=config.num_channels,
             out_channels=self.embed_dim,
             kernel_size=self.patch_size,
-            strid=self.patch_size,
+            stride=self.patch_size,
             padding="valid", # No padding is added
         ) 
         
@@ -119,7 +119,7 @@ class SiglipVisionEmbeddings(nn.Module):
         # where Num_Patches = Num_Patches_H * Num_Patches_W
         embeddings = patch_embeds.flatten(2)
         # [Batch_Size, Embed_Dim, Num_Patches] -> [Batch_Size, Num_Patches, Embed_Dim]
-        embeddings = embeddings.transpose(1,2) 
+        embeddings = embeddings.transpose(1, 2) 
         # Add position embeddings to each patch. Each positional encoding is a vector of size [Embed_Dim]
         # Contrary to the Vanilla transformer where we used sinusoidal embeddings, 
         # which were precalculated,here the positional embeddings are learned
@@ -171,7 +171,7 @@ class SiglipEncoderLayer(nn.Module):
         #[Batch_size, num_patches, embed_dim] -> [Batch_size, num_patches, embed_dim]        
         hidden_states = self.layer_norm1(hidden_states)
         #[Batch_size, num_patches, embed_dim] -> [Batch_size, num_patches, embed_dim]        
-        hidden_states = self.self_attn(hidden_states=hidden_states)
+        hidden_states, _ = self.self_attn(hidden_states=hidden_states)
         #[Batch_size, num_patches, embed_dim]
         hidden_states = residual + hidden_states        
         #residual: [Batch_size, num_patches, embed_dim]        
